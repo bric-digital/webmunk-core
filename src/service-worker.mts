@@ -1,10 +1,10 @@
 import { WebmunkConfiguration } from "./extension.mjs"
 
-interface WebmunkConfigurationResponse {
+export interface WebmunkConfigurationResponse {
   webmunkConfiguration:WebmunkConfiguration
 }
 
-interface WebmunkIdentifierResponse {
+export interface WebmunkIdentifierResponse {
   webmunkIdentifier:string
 }
 

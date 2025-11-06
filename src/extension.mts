@@ -1,7 +1,16 @@
 import $ from 'jquery'
 
+interface WebmunkUIDefinition {
+  title:string,
+  identifier:string
+}
+
+interface WebmunkConfiguration {
+  ui: WebmunkUIDefinition[]
+}
+
 export class WebmunkExtensionModule {
-  instantiationTarget: String
+  instantiationTarget:string
 
   constructor() {
     if (new.target === WebmunkExtensionModule) {
@@ -32,8 +41,8 @@ export const webmunkCorePlugin = {
   interface: {
     identifier: null
   },
-  loadInitialConfigation: async function(configPath: string) {
-    return new Promise<any>((resolve, reject) => {
+  loadInitialConfigation: async function(configPath:string) {
+    return new Promise<string>((resolve, reject) => {
       let configUrl = configPath
 
       if (!configPath.toLowerCase().startsWith('http:') && !configPath.toLowerCase().startsWith('https://')) {
@@ -43,7 +52,7 @@ export const webmunkCorePlugin = {
       fetch(configUrl)
         .then((response: Response) => {
           if (response.ok) {
-            response.json().then((jsonData: any) => {
+            response.json().then((jsonData:WebmunkConfiguration) => {
               chrome.runtime.sendMessage({
                 'messageType': 'loadInitialConfiguration',
                 'configuration': jsonData
@@ -58,12 +67,12 @@ export const webmunkCorePlugin = {
           } else {
             reject(`Received error status: ${response.statusText}`)
           }
-        }, (reason: any) => {
+        }, (reason:string) => {
           reject(`${reason}`)
         })
       })
   },
-  validateInterface: async function (uiDefinition:Object) {
+  validateInterface: async function (uiDefinition:WebmunkUIDefinition) {
     return new Promise<void>((resolve, reject) => {
       const requirements = []
 
@@ -74,8 +83,8 @@ export const webmunkCorePlugin = {
       console.log('requirements')
       console.log(requirements)
 
-      for (let requirement of requirements) {
-        for (let extensionModule of registeredExtensionModules) {
+      for (const requirement of requirements) {
+        for (const extensionModule of registeredExtensionModules) {
           if (extensionModule.checkRequirement !== undefined) {
             extensionModule.checkRequirement(requirement)
               .then((isFulfilled) => {
@@ -99,18 +108,18 @@ export const webmunkCorePlugin = {
     })
   },
   fetchCurrentInterface: async function() {
-    return new Promise<any>((resolve) => {
+    return new Promise<object>((resolve) => {
       chrome.runtime.sendMessage({
         'messageType': 'fetchConfiguration',
-      }).then((configuration: any) => {
+      }).then((configuration:WebmunkConfiguration) => {
         console.log('configuration')
         console.log(configuration)
 
-        for (let uiDefinition of configuration.ui) {
+        for (const uiDefinition of configuration.ui) {
           webmunkCorePlugin.validateInterface(uiDefinition)
             .then(() => {
               resolve(uiDefinition)
-            }, (reason:any) => {
+            }, (reason:string) => {
               console.log(`Interface "${uiDefinition.identifier} invalid: ${reason}`)
             })
         }
@@ -119,7 +128,7 @@ export const webmunkCorePlugin = {
   },
   refreshInterface: () => {
     webmunkCorePlugin.fetchCurrentInterface()
-      .then((uiDefinition: any) => {
+      .then((uiDefinition:WebmunkUIDefinition) => {
         if (webmunkCorePlugin.interface.identifier !== uiDefinition.identifier) {
           webmunkCorePlugin.interface = uiDefinition
 
@@ -127,7 +136,7 @@ export const webmunkCorePlugin = {
         }
       })
   },
-  loadInterface: (uiDefinition) => {
+  loadInterface: (uiDefinition:WebmunkUIDefinition) => {
     document.title = uiDefinition.title
 
     const templateUrl = chrome.runtime.getURL(`interfaces/${uiDefinition.identifier}.html`)
@@ -135,10 +144,10 @@ export const webmunkCorePlugin = {
     fetch(templateUrl)
       .then((response: Response) => {
         if (response.ok) {
-          response.text().then((htmlText: any) => {
+          response.text().then((htmlText:string) => {
             document.body.innerHTML = htmlText
 
-            for (let extensionModule of registeredExtensionModules) {
+            for (const extensionModule of registeredExtensionModules) {
               if (extensionModule.activateInterface !== undefined) {
                 if (extensionModule.activateInterface(uiDefinition)) {
                   return
@@ -151,11 +160,11 @@ export const webmunkCorePlugin = {
         } else {
           document.body.innerHTML = `Error loading template file at ${templateUrl}...`
         }
-      }, (reason: any) => {
-        document.body.innerHTML = `Error loading template file at ${templateUrl}...`
+      }, (reason:string) => {
+        document.body.innerHTML = `Error loading template file at ${templateUrl}: ${reason}...`
       })
   },
-  setIdentifier: async (identifier:String) => {
+  setIdentifier: async (identifier:string) => {
     return new Promise<void>((resolve) => {
       chrome.runtime.sendMessage({
         'messageType': 'setIdentifier',
@@ -173,7 +182,7 @@ class WebmunkCoreIdentifierExtensionModule extends WebmunkExtensionModule {
   }
 
   async validateIdentifier(identifier) {
-    return new Promise<String>((resolve, reject) => {
+    return new Promise<string>((resolve, reject) => {
       if ([null, undefined].includes(identifier) || identifier.length == 0) {
         reject('Please provide a valid (non-empty) identifier')
       } else {
@@ -182,31 +191,31 @@ class WebmunkCoreIdentifierExtensionModule extends WebmunkExtensionModule {
     })
   }
 
-  activateInterface(uiDefinition:any):Boolean {
+  activateInterface(uiDefinition:WebmunkUIDefinition):boolean {
     console.log('activateInterface')
     console.log(uiDefinition)
 
-    const me = this
+    const me = this  // eslint-disable-line @typescript-eslint/no-this-alias
 
     if (uiDefinition.identifier == 'identifier') {
       $('#coreSaveIdentifier').off('click')
       $('#coreSaveIdentifier').on('click', () => {
         const identifier = $('input[type="text"]').val()
-        console.log(`coreSaveIdentifier.click: ${identifier}`)
+
         me.validateIdentifier(identifier)
-          .then((finalIdentifier:String) => {
+          .then((finalIdentifier:string) => {
             webmunkCorePlugin.setIdentifier(finalIdentifier)
               .then(() => {
                 webmunkCorePlugin.refreshInterface()
               })
-          }, (message:String) => {
+          }, (message:string) => {
             alert(message)
           })
       })
 
       chrome.runtime.sendMessage({
         'messageType': 'getIdentifier'
-      }).then((identifier: string) => {
+      }).then((identifier:string) => {
         console.log('getIdentifier')
         console.log(identifier)
 
@@ -219,8 +228,8 @@ class WebmunkCoreIdentifierExtensionModule extends WebmunkExtensionModule {
     return false
   }
 
-  async checkRequirement(requirement:String) {
-    return new Promise<Boolean>((resolve) => {
+  async checkRequirement(requirement:string) {
+    return new Promise<boolean>((resolve) => {
       console.log(`WebmunkCoreIdentifierExtensionModule.checkRequirement: ${requirement}`)
 
       if (requirement === 'has_identifier') {

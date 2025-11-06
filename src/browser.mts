@@ -1,5 +1,5 @@
 export class WebmunkClientModule {
-  instantiationTarget:String
+  instantiationTarget:string
 
   constructor() {
     if (new.target === WebmunkClientModule) {
@@ -15,7 +15,7 @@ export class WebmunkClientModule {
 }
 
 export function registerWebmunkModule(webmunkModule:WebmunkClientModule) {
-  console.log(`Registering ${webmunkModule}...`)
+  console.log(`[webmunk-core/browser] Registering ${webmunkModule}...`)
 
   webmunkModule.setup()
 }

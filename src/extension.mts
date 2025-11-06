@@ -1,6 +1,6 @@
 import $ from 'jquery'
 
-interface WebmunkUIDefinition {
+export interface WebmunkUIDefinition {
   title:string,
   identifier:string
 }

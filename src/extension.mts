@@ -39,7 +39,8 @@ export function registerWebmunkModule(webmunkModule:WebmunkExtensionModule) {
 
 export const webmunkCorePlugin = {
   interface: {
-    identifier: null
+    identifier: null,
+    title: ''
   },
   loadInitialConfigation: async function(configPath:string) {
     return new Promise<string>((resolve, reject) => {

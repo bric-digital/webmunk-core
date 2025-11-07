@@ -28,7 +28,7 @@ export function registerWebmunkModule(webmunkModule:WebmunkServiceWorkerModule) 
   console.log(`Register ${webmunkModule}`)
 }
 
-const webmunkCorePlugin = {
+const webmunkCorePlugin = { // TODO rename to "engine" or something...
   openExtensionWindow: () => {
     const optionsUrl = chrome.runtime.getURL('index.html')
 
@@ -93,12 +93,9 @@ const webmunkCorePlugin = {
     }
 
     if (message.messageType === 'fetchConfiguration') {
-      chrome.storage.local.get('webmunkConfiguration')
-        .then((response:{ [name: string]: any; }) => { // eslint-disable-line @typescript-eslint/no-explicit-any
-
-          const configResponse:WebmunkConfigurationResponse = response as WebmunkConfigurationResponse
-
-          sendResponse(configResponse.webmunkConfiguration)
+      webmunkCorePlugin.fetchConfigration()
+        .then((configuration:WebmunkConfiguration) => {
+          sendResponse(configuration)
         })
 
       return true
@@ -141,6 +138,14 @@ const webmunkCorePlugin = {
               resolve('Success: Configuration initialized.')
             })
           }
+        })
+    })
+  }, fetchConfigration(): Promise<WebmunkConfiguration> {
+    return new Promise((resolve, reject) => {
+      chrome.storage.local.get('webmunkConfiguration')
+        .then((response:{ [name: string]: any; }) => { // eslint-disable-line @typescript-eslint/no-explicit-any
+          const idResponse:WebmunkConfigurationResponse = response as WebmunkConfigurationResponse
+          resolve(idResponse.webmunkConfiguration)
         })
     })
   }

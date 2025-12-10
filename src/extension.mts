@@ -158,11 +158,16 @@ export const webmunkCorePlugin = {
 
     const templateUrl = chrome.runtime.getURL(`interfaces/${uiDefinition.identifier}.html`)
 
+    const contentElement:HTMLElement | null = document.getElementById('webmunk-content')
+
     fetch(templateUrl)
       .then((response: Response) => {
         if (response.ok) {
           response.text().then((htmlText:string) => {
-            document.body.innerHTML = htmlText
+
+            if (contentElement !== null) {
+              contentElement.innerHTML = htmlText
+            }
 
             for (const extensionModule of registeredExtensionModules) {
               if (extensionModule.activateInterface !== undefined) {
@@ -172,13 +177,19 @@ export const webmunkCorePlugin = {
               }
             }
 
-            document.body.innerHTML = `Unable to find module to activate ${templateUrl}...`
+            if (contentElement !== null) {
+              contentElement.innerHTML = `Unable to find module to activate ${templateUrl}...`
+            }
           })
         } else {
-          document.body.innerHTML = `Error loading template file at ${templateUrl}...`
+          if (contentElement !== null) {
+            contentElement.innerHTML = `Error loading template file at ${templateUrl}...`
+          }
         }
       }, (reason:string) => {
-        document.body.innerHTML = `Error loading template file at ${templateUrl}: ${reason}...`
+        if (contentElement !== null) {
+          contentElement.innerHTML = `Error loading template file at ${templateUrl}: ${reason}...`
+        }
       })
   },
   setIdentifier: async (identifier:string) => {

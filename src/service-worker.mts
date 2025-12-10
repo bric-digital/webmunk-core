@@ -92,6 +92,15 @@ const webmunkCorePlugin = { // TODO rename to "engine" or something...
       return true
     }
 
+    if (message.messageType == 'updateConfiguration') {
+      webmunkCorePlugin.updateConfiguration(message.configuration)
+        .then((response:string) => {
+          sendResponse(response)
+        })
+
+      return true
+    }
+
     if (message.messageType === 'fetchConfiguration') {
       webmunkCorePlugin.fetchConfiguration()
         .then((configuration:WebmunkConfiguration) => {
@@ -139,6 +148,15 @@ const webmunkCorePlugin = { // TODO rename to "engine" or something...
             })
           }
         })
+    })
+  },
+  updateConfiguration: (configuration:WebmunkConfiguration): Promise<string> => {
+    return new Promise((resolve) => {
+      chrome.storage.local.set({
+        webmunkConfiguration: configuration
+      }).then(() => {
+        resolve('Success: Configuration updated.')
+      })
     })
   }, fetchConfiguration(): Promise<WebmunkConfiguration> {
     return new Promise((resolve, reject) => {

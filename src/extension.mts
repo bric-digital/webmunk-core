@@ -227,7 +227,7 @@ class WebmunkCoreIdentifierExtensionModule extends WebmunkExtensionModule {
             if (response.ok) {
               response.json().then((jsonData:WebmunkConfiguration) => {
                 chrome.runtime.sendMessage({
-                  'messageType': 'loadInitialConfiguration',
+                  'messageType': 'updateConfiguration',
                   'configuration': jsonData
                 }).then((response: string) => {
                   if (response.toLowerCase().startsWith('error')) {

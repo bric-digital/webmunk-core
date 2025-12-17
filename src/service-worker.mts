@@ -22,10 +22,22 @@ export class WebmunkServiceWorkerModule {
   setup() {
     console.log(`TODO: Implement in ${this.instantiationTarget}...`)
   }
+
+  logEvent(event:any) {
+    if (event !== undefined) {
+
+    }
+  }
 }
 
+const registeredExtensionModules:WebmunkServiceWorkerModule[] = []
+
 export function registerWebmunkModule(webmunkModule:WebmunkServiceWorkerModule) {
-  console.log(`Register ${webmunkModule}`)
+  if (!registeredExtensionModules.includes(webmunkModule)) {
+    registeredExtensionModules.push(webmunkModule)
+
+    webmunkModule.setup()
+  }
 }
 
 const webmunkCorePlugin = { // TODO rename to "engine" or something...
@@ -126,6 +138,18 @@ const webmunkCorePlugin = { // TODO rename to "engine" or something...
           const idResponse:WebmunkIdentifierResponse = response as WebmunkIdentifierResponse
           sendResponse(idResponse.webmunkIdentifier)
         })
+
+      return true
+    }
+
+    if (message.messageType == 'logEvent') {
+      // message.event = { name:string, ... }
+
+      for (const extensionModule of registeredExtensionModules) {
+        if (extensionModule.logEvent !== undefined) {
+          extensionModule.logEvent(message.event)
+        }
+      }
 
       return true
     }

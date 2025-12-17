@@ -143,6 +143,9 @@ const webmunkCorePlugin = { // TODO rename to "engine" or something...
     }
 
     if (message.messageType == 'logEvent') {
+      console.log(`[webmunk-core] logEvent`)
+      console.log(message.event)
+
       // message.event = { name:string, ... }
 
       for (const extensionModule of registeredExtensionModules) {

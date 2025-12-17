@@ -149,7 +149,7 @@ const webmunkCorePlugin = { // TODO rename to "engine" or something...
       // message.event = { name:string, ... }
 
       for (const extensionModule of registeredExtensionModules) {
-        console.log(`TRY ${extensionModule}`)
+        console.log(`TRY ${extensionModule.instantiationTarget}`)
         console.log(extensionModule.logEvent)
 
         if (extensionModule.logEvent !== undefined) {

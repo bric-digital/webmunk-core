@@ -19,7 +19,8 @@
     "exports": {
         "./extension": "./src/extension.mts",
         "./browser": "./src/browser.mts",
-        "./service-worker": "./src/service-worker.mts"
+        "./service-worker": "./src/service-worker.mts",
+        "./list-utilities": "./src/list-utilities.mts"
     },
     "scripts": {
         "build": "tsc",
@@ -28,6 +29,7 @@
     "devDependencies": {
         "@eslint/js": "^9.39.1",
         "@types/jquery": "^3.5.33",
+        "@types/psl": "^1.1.3",
         "chrome-types": "^0.1.387",
         "eslint": "^9.39.1",
         "globals": "^16.5.0",
@@ -36,6 +38,7 @@
         "typescript-eslint": "^8.46.3"
     },
     "dependencies": {
-        "jquery": "^3.7.1"
+        "jquery": "^3.7.1",
+        "psl": "^1.9.0"
     }
 }

@@ -1,0 +1,25 @@
+{
+  "name": "webmunk-list-utilities-tests",
+  "version": "1.0.0",
+  "description": "Automated tests for webmunk-core list utilities using Playwright",
+  "type": "module",
+  "scripts": {
+    "test": "playwright test",
+    "test:headed": "playwright test --headed",
+    "test:ui": "playwright test --ui",
+    "test:debug": "playwright test --debug",
+    "build-test-bundle": "node build-test-bundle.js"
+  },
+  "keywords": [
+    "webmunk",
+    "testing",
+    "playwright",
+    "indexeddb"
+  ],
+  "author": "Behavioral Research Innovation Center",
+  "license": "Apache-2.0",
+  "devDependencies": {
+    "@playwright/test": "^1.48.0",
+    "esbuild": "^0.27.2"
+  }
+}

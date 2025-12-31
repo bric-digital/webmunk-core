@@ -79,6 +79,7 @@ const webmunkCorePlugin = { // TODO rename to "engine" or something...
     const loadedScripts = new Set()
 
     chrome.tabs.onUpdated.addListener(function (tabId, changeInfo, tab) {
+
       if (changeInfo.status === 'complete') {
         loadedScripts.delete(`${tabId}-${tab.url}`)
       } else if (changeInfo.status === 'loading' && loadedScripts.has(`${tabId}-${tab.url}`) === false) {
@@ -101,6 +102,7 @@ const webmunkCorePlugin = { // TODO rename to "engine" or something...
     chrome.runtime.onMessage.addListener(webmunkCorePlugin.handleMessage)
   },
   handleMessage: (message:any, sender:any, sendResponse:(response:any) => void):boolean => { // eslint-disable-line @typescript-eslint/no-explicit-any
+    //receive message from extension
     if (message.messageType == 'loadInitialConfiguration') {
       webmunkCorePlugin.initializeConfiguration(message.configuration)
         .then((response:string) => {
@@ -172,14 +174,30 @@ const webmunkCorePlugin = { // TODO rename to "engine" or something...
     return new Promise((resolve) => {
       chrome.storage.local.get('webmunkConfiguration')
         .then((response:{ [name: string]: any; }) => { // eslint-disable-line @typescript-eslint/no-explicit-any
+
           const configResponse:WebmunkConfigurationResponse = response as WebmunkConfigurationResponse
 
           if (configResponse.webmunkConfiguration !== undefined) {
+
             resolve('Error: Configuration already initialized.')
           } else {
             chrome.storage.local.set({
               webmunkConfiguration: configuration
             }).then(() => {
+              // redirect user page to third party server EK
+              const redirectConfig = configuration['redirect_on_install'];
+
+              if(redirectConfig && redirectConfig.enabled === true){
+                webmunkCorePlugin.handleMessage({
+                  messageType: 'logEvent',
+                  event: {
+                      name: 'page-redirect',
+                      url: redirectConfig.url,
+                      timestamp: new Date().toISOString()
+                  }
+                }, null, () => { });
+                chrome.tabs.create({ url: redirectConfig.url });
+              }
               resolve('Success: Configuration initialized.')
             })
           }

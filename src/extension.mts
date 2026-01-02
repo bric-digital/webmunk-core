@@ -8,7 +8,18 @@ export interface WebmunkUIDefinition {
 
 export interface WebmunkConfiguration {
   ui:WebmunkUIDefinition[],
-  configuration_url:String
+  configuration_url?:string,
+
+  // Policy flags (defaults chosen in code for safety):
+  // - require_remote_configuration: true (fail closed by default)
+  // - allow_offline_identifier_setup: false
+  // - offline_mode_uses: 'last_known_good'
+  require_remote_configuration?:boolean,
+  allow_offline_identifier_setup?:boolean,
+  offline_mode_uses?:'last_known_good'|'current',
+
+  // Allow modules/extensions to hang arbitrary data off configuration.
+  [key: string]: unknown
 }
 
 export class WebmunkExtensionModule {
@@ -209,6 +220,11 @@ class WebmunkCoreIdentifierExtensionModule extends WebmunkExtensionModule {
     // None needed for default pass-through
   }
 
+  private configBool(configuration:WebmunkConfiguration, key:string, defaultValue:boolean): boolean {
+    const value = configuration[key]
+    return typeof value === 'boolean' ? value : defaultValue
+  }
+
   async validateIdentifier(identifier:string) {
     return new Promise<string>((resolve, reject) => {
       chrome.runtime.sendMessage({
@@ -219,33 +235,139 @@ class WebmunkCoreIdentifierExtensionModule extends WebmunkExtensionModule {
         console.log('configuration')
         console.log(configuration)
 
-        const configUrlStr = configuration['configuration_url'] as String
+        const requireRemoteConfiguration = this.configBool(configuration, 'require_remote_configuration', true)
+        const allowOfflineIdentifierSetup = this.configBool(configuration, 'allow_offline_identifier_setup', false)
+        const offlineModeUses = (typeof configuration['offline_mode_uses'] === 'string' ? configuration['offline_mode_uses'] : 'last_known_good') as string
+
+        const configUrlStr = typeof configuration['configuration_url'] === 'string' ? configuration['configuration_url'] : ''
+
+        // If a study doesn't use remote configuration at all, don't block identifier setup.
+        if (configUrlStr.length === 0) {
+          if (requireRemoteConfiguration) {
+            reject('CONFIG_URL_MISSING|Remote configuration is required but configuration_url is missing.')
+          } else {
+            resolve(identifier)
+          }
+          return
+        }
 
         const configUrl:URL = new URL(configUrlStr.replaceAll('<IDENTIFIER>', identifier))
 
         fetch(configUrl)
-          .then((response: Response) => {
-            if (response.ok) {
-              response.json().then((jsonData:WebmunkConfiguration) => {
-                console.log(`${configUrl}:`)
+          .then(async (fetchResponse: Response) => {
+            if (fetchResponse.ok) {
+              const jsonData:WebmunkConfiguration = await fetchResponse.json()
+              console.log(`${configUrl}:`)
+              console.log(jsonData)
+
+              const updateResponse: string = await chrome.runtime.sendMessage({
+                'messageType': 'updateConfiguration',
+                'configuration': jsonData
+              })
+
+              if (updateResponse.toLowerCase().startsWith('error')) {
+                reject(`Received error from service worker: ${updateResponse}`)
+              } else {
+                resolve(identifier)
+              }
+
+              return
+            }
+
+            // If the specific identifier isn't found, try falling back to "default".
+            // This allows a backend to provide a generic config without blocking setup.
+            if (fetchResponse.status === 404) {
+              const fallbackUrl:URL = new URL(configUrlStr.replaceAll('<IDENTIFIER>', 'default'))
+              const fallbackResponse: Response = await fetch(fallbackUrl)
+
+              if (fallbackResponse.ok) {
+                const jsonData:WebmunkConfiguration = await fallbackResponse.json()
+                console.log(`${fallbackUrl}:`)
                 console.log(jsonData)
-                chrome.runtime.sendMessage({
+
+                const updateResponse: string = await chrome.runtime.sendMessage({
                   'messageType': 'updateConfiguration',
                   'configuration': jsonData
-                }).then((response: string) => {
-                  if (response.toLowerCase().startsWith('error')) {
-                    reject(`Received error from service worker: ${response}`)
+                })
+
+                if (updateResponse.toLowerCase().startsWith('error')) {
+                  reject(`Received error from service worker: ${updateResponse}`)
+                } else {
+                  resolve(identifier)
+                }
+
+                return
+              }
+
+              reject(`CONFIG_HTTP_ERROR|${fallbackUrl.href}|${fallbackResponse.status}|${fallbackResponse.statusText}`)
+              return
+            }
+
+            // Remote config fetch failed.
+            // Default behavior (safer for research): fail closed unless explicitly configured otherwise.
+            const canProceedOffline = allowOfflineIdentifierSetup || requireRemoteConfiguration === false
+
+            if (canProceedOffline && offlineModeUses === 'last_known_good') {
+              const lastKnownGood: WebmunkConfiguration | undefined = await chrome.runtime.sendMessage({
+                'messageType': 'fetchLastKnownGoodConfiguration'
+              })
+
+              if (lastKnownGood !== undefined) {
+                const updateResponse: string = await chrome.runtime.sendMessage({
+                  'messageType': 'updateConfiguration',
+                  'configuration': lastKnownGood
+                })
+
+                if (updateResponse.toLowerCase().startsWith('error')) {
+                  reject(`Received error from service worker: ${updateResponse}`)
+                } else {
+                  resolve(identifier)
+                }
+
+                return
+              }
+
+              // No cached config exists yet. If remote config isn't required, continue with the current/bundled config.
+              if (requireRemoteConfiguration === false) {
+                resolve(identifier)
+                return
+              }
+            }
+
+            reject(`CONFIG_HTTP_ERROR|${configUrl.href}|${fetchResponse.status}|${fetchResponse.statusText}`)
+          })
+          .catch((err: unknown) => {
+            const message = err instanceof Error ? err.message : String(err)
+            // Same offline fallback behavior for network-level failures.
+            const canProceedOffline = allowOfflineIdentifierSetup || requireRemoteConfiguration === false
+
+            if (canProceedOffline && offlineModeUses === 'last_known_good') {
+              chrome.runtime.sendMessage({
+                'messageType': 'fetchLastKnownGoodConfiguration'
+              }).then(async (lastKnownGood: WebmunkConfiguration | undefined) => {
+                if (lastKnownGood !== undefined) {
+                  const updateResponse: string = await chrome.runtime.sendMessage({
+                    'messageType': 'updateConfiguration',
+                    'configuration': lastKnownGood
+                  })
+
+                  if (updateResponse.toLowerCase().startsWith('error')) {
+                    reject(`Received error from service worker: ${updateResponse}`)
                   } else {
                     resolve(identifier)
                   }
-                })
+                } else if (requireRemoteConfiguration === false) {
+                  resolve(identifier)
+                } else {
+                  reject(`CONFIG_FETCH_FAILED|${configUrl.href}|${message}`)
+                }
               })
-          } else {
-            reject(`Received error status: ${response.statusText}`)
-          }
-        }, (reason:string) => {
-          reject(`${reason}`)
-        })
+
+              return
+            }
+
+            reject(`CONFIG_FETCH_FAILED|${configUrl.href}|${message}`)
+          })
       })
     })
   }
@@ -259,17 +381,51 @@ class WebmunkCoreIdentifierExtensionModule extends WebmunkExtensionModule {
     if (uiDefinition.identifier == 'identifier') {
       $('#coreSaveIdentifier').off('click')
       $('#coreSaveIdentifier').on('click', () => {
-        const identifier = $('input[type="text"]').val()
+        const identifier = ($('input[type="text"]').val() as string | undefined)?.trim() ?? ''
 
-        me.validateIdentifier(identifier as string)
+        if (identifier.length === 0) {
+          alert('Please enter an ID.')
+          return
+        }
+
+        me.validateIdentifier(identifier)
           .then((finalIdentifier:string) => {
             webmunkCorePlugin.setIdentifier(finalIdentifier)
               .then(() => {
                 webmunkCorePlugin.refreshInterface()
               })
-          }, (message:string) => {
+          }, (rawMessage:unknown) => {
+            let message = rawMessage instanceof Error ? rawMessage.message : String(rawMessage)
+
+            if (message.startsWith('CONFIG_FETCH_FAILED|')) {
+              const parts = message.split('|')
+              const url = parts[1] ?? '(unknown url)'
+              const err = parts.slice(2).join('|') || 'Unknown error'
+              message = `Couldn't reach the configuration server (${url}). Please check your network/backend and try again.\n\nDetails: ${err}`
+            } else if (message.startsWith('CONFIG_HTTP_ERROR|')) {
+              const parts = message.split('|')
+              const url = parts[1] ?? '(unknown url)'
+              const status = parts[2] ?? 'unknown'
+              const statusText = parts.slice(3).join('|') || ''
+              message = `Configuration server returned an error (${status}${statusText ? ` ${statusText}` : ''}) for ${url}.\n\nPlease try again.`
+            } else if (message.startsWith('CONFIG_URL_MISSING|')) {
+              const parts = message.split('|')
+              message = parts.slice(1).join('|') || 'Remote configuration is required but configuration_url is missing.'
+            }
+
             alert(message)
           })
+      })
+
+      // Allow pressing Enter in the identifier input to submit.
+      // (Matches the "Submit" button behavior and avoids requiring mouse interaction.)
+      $('#inputIdentifier').off('keydown')
+      $('#inputIdentifier').on('keydown', (e) => {
+        // jQuery keydown event: prefer `which` for broad compatibility + TS friendliness.
+        if ((e as { which?: number; key?: string }).which === 13 || (e as { which?: number; key?: string }).key === 'Enter') {
+          e.preventDefault()
+          $('#coreSaveIdentifier').trigger('click')
+        }
       })
 
       chrome.runtime.sendMessage({

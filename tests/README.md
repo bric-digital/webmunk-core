@@ -654,7 +654,7 @@ When integrating into a real extension:
 
 After verifying list utilities work:
 
-1. Integrate into webmunk-block-allow module
+1. Integrate into webmunk-lists-front-end module
 2. Create UI for list management
 3. Test in browser extensions
 4. Performance testing with real browsing history

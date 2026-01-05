@@ -11,7 +11,7 @@ import psl from 'psl'
 // Types and Interfaces
 // ============================================================================
 
-export type PatternType = 'domain' | 'subdomain_wildcard' | 'exact_url' | 'regex'
+export type PatternType = 'domain' | 'subdomain_wildcard' | 'exact_url' | 'host_path_prefix' | 'regex'
 export type EntrySource = 'backend' | 'user' | 'generated'
 
 export interface ListEntry {
@@ -638,6 +638,60 @@ export function matchesPattern(url: string, pattern: string, patternType: Patter
 
       case 'exact_url': {
         return url === pattern
+      }
+
+      case 'host_path_prefix': {
+        // Match an anchored host + path prefix, e.g.:
+        // - pattern: "google.com/maps" matches "https://www.google.com/maps/..."
+        // - pattern: "https://google.com/maps" also supported
+        //
+        // We normalize an optional leading "www." on both sides for convenience.
+        const normalizeHost = (h: string) => h.toLowerCase().replace(/^www\./, '')
+
+        const urlHostNormalized = normalizeHost(hostname)
+        const urlPath = urlObj.pathname
+
+        let patternHost = ''
+        let patternPath = ''
+
+        // If pattern is a full URL, use URL parsing. Otherwise treat as "host/path".
+        if (pattern.includes('://')) {
+          const patternUrl = new URL(pattern)
+          patternHost = patternUrl.hostname
+          patternPath = patternUrl.pathname
+        } else {
+          const firstSlashIdx = pattern.indexOf('/')
+          if (firstSlashIdx === -1) {
+            // No path provided; this pattern type is meant to be host+path.
+            return false
+          }
+
+          patternHost = pattern.slice(0, firstSlashIdx)
+          patternPath = pattern.slice(firstSlashIdx)
+        }
+
+        const patternHostNormalized = normalizeHost(patternHost)
+        if (!patternHostNormalized || urlHostNormalized !== patternHostNormalized) {
+          return false
+        }
+
+        // Ensure patternPath starts with '/' so it aligns with URL.pathname.
+        if (!patternPath.startsWith('/')) {
+          patternPath = '/' + patternPath
+        }
+
+        if (urlPath.startsWith(patternPath)) {
+          return true
+        }
+
+        // Also allow matching the same path without trailing slash
+        // e.g. pattern "/maps/" should match pathname "/maps"
+        if (patternPath.endsWith('/')) {
+          const withoutTrailingSlash = patternPath.slice(0, -1)
+          return urlPath === withoutTrailingSlash
+        }
+
+        return false
       }
 
       case 'regex': {

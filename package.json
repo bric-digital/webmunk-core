@@ -25,9 +25,13 @@
     "scripts": {
         "build": "tsc",
         "lint": "eslint src",
+        "pretest": "node tests/scripts/build-test-bundle.js",
         "test": "playwright test",
-        "test:unit": "playwright test specs/",
-        "test:ci": "playwright test --reporter=dot"
+        "test:ci": "playwright test --reporter=dot",
+        "test:debug": "playwright test --debug",
+        "test:headed": "playwright test --headed",
+        "test:ui": "playwright test --ui",
+        "test:unit": "playwright test specs/"
     },
     "devDependencies": {
         "@eslint/js": "^9.39.1",
@@ -38,7 +42,9 @@
         "globals": "^16.5.0",
         "jiti": "^2.6.1",
         "typescript": "^5.9.2",
-        "typescript-eslint": "^8.46.3"
+        "typescript-eslint": "^8.46.3",
+        "@playwright/test": "^1.48.0",
+        "esbuild": "^0.27.2"
     },
     "dependencies": {
         "jquery": "^3.7.1",

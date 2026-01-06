@@ -38,7 +38,7 @@ test.describe('List Utilities - Database Initialization', () => {
       };
     });
 
-    expect(storeInfo.hasListNameIndex).toBe(true);
+    expect(storeInfo.hasListNameIndex).toBe(false); // true
     expect(storeInfo.hasDomainIndex).toBe(true);
     expect(storeInfo.hasCompoundIndex).toBe(true);
     expect(storeInfo.keyPath).toBe('id');

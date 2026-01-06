@@ -12,8 +12,8 @@ import { dirname, join } from 'path'
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
 
-const inputFile = join(__dirname, '../src/list-utilities.mts')
-const outputFile = join(__dirname, 'list-utilities.bundle.js')
+const inputFile = join(__dirname, '../../src/list-utilities.mts')
+const outputFile = join(__dirname, '../src/build/list-utilities.bundle.js')
 
 try {
   await esbuild.build({

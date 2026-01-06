@@ -46,6 +46,16 @@ export function registerWebmunkModule(webmunkModule:WebmunkServiceWorkerModule) 
   }
 }
 
+export function dispatchEvent(event: { name: string; [key: string]: unknown }) {
+  console.log(`[webmunk-core] dispatchEvent: ${event.name} -- ${registeredExtensionModules.length} modules`)
+
+  for (const extensionModule of registeredExtensionModules) {
+    if (extensionModule.logEvent !== undefined) {
+      extensionModule.logEvent(event)
+    }
+  }
+}
+
 const webmunkCorePlugin = { // TODO rename to "engine" or something...
   openExtensionWindow: () => {
     const optionsUrl = chrome.runtime.getURL('index.html')

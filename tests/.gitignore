@@ -1,0 +1,14 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+list-utilities.bundle.js
+list-utilities.bundle.js.map
+
+# Playwright
+playwright-report/
+test-results/
+.playwright/
+
+# OS files
+.DS_Store

@@ -8,7 +8,7 @@ export interface WebmunkUIDefinition {
 
 export interface WebmunkConfiguration {
   ui:WebmunkUIDefinition[],
-  configuration_url:String
+  configuration_url:string
 }
 
 export class WebmunkExtensionModule {
@@ -219,7 +219,7 @@ class WebmunkCoreIdentifierExtensionModule extends WebmunkExtensionModule {
         console.log('configuration')
         console.log(configuration)
 
-        const configUrlStr = configuration['configuration_url'] as String
+        const configUrlStr = configuration['configuration_url'] as string
 
         const configUrl:URL = new URL(configUrlStr.replaceAll('<IDENTIFIER>', identifier))
 

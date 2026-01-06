@@ -23,9 +23,9 @@ export class WebmunkServiceWorkerModule {
     console.log(`TODO: Implement in ${this.instantiationTarget}...`)
   }
 
-  logEvent(event:any) {
+  logEvent(event:object) {
     if (event !== undefined) {
-
+      console.log('WebmunkServiceWorkerModule: implement "logEvent" in subclass...')
     }
   }
 
@@ -149,15 +149,9 @@ const webmunkCorePlugin = { // TODO rename to "engine" or something...
     }
 
     if (message.messageType == 'logEvent') {
-      console.log(`[webmunk-core] logEvent -- ${registeredExtensionModules.length}`)
-      console.log(message.event)
-
       // message.event = { name:string, ... }
 
       for (const extensionModule of registeredExtensionModules) {
-        console.log(`TRY ${extensionModule.moduleName()}`)
-        console.log(extensionModule.logEvent)
-
         if (extensionModule.logEvent !== undefined) {
           extensionModule.logEvent(message.event)
         }
@@ -196,7 +190,7 @@ const webmunkCorePlugin = { // TODO rename to "engine" or something...
     })
   },
   fetchConfiguration(): Promise<WebmunkConfiguration> {
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve, reject) => { // eslint-disable-line @typescript-eslint/no-unused-vars
       chrome.storage.local.get('webmunkConfiguration')
         .then((response:{ [name: string]: any; }) => { // eslint-disable-line @typescript-eslint/no-explicit-any
           const idResponse:WebmunkConfigurationResponse = response as WebmunkConfigurationResponse

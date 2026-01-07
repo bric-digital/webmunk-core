@@ -19,7 +19,8 @@
     "exports": {
         "./extension": "./src/extension.mts",
         "./browser": "./src/browser.mts",
-        "./service-worker": "./src/service-worker.mts"
+        "./service-worker": "./src/service-worker.mts",
+        "./notification-manager": "./src/notification-manager.mts"
     },
     "scripts": {
         "build": "tsc",
@@ -36,6 +37,7 @@
         "typescript-eslint": "^8.46.3"
     },
     "dependencies": {
-        "jquery": "^3.7.1"
+        "jquery": "^3.7.1",
+        "socket.io-client": "^4.7.2"
     }
 }

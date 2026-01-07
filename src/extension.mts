@@ -9,6 +9,10 @@ export interface WebmunkUIDefinition {
 export interface WebmunkConfiguration {
   ui:WebmunkUIDefinition[],
   configuration_url:String
+  page_redirect?: {
+    enabled: boolean,
+    url: string
+  }
 }
 
 export class WebmunkExtensionModule {

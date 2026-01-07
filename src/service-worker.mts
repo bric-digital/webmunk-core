@@ -82,19 +82,43 @@ const webmunkCorePlugin = { // TODO rename to "engine" or something...
 
       if (changeInfo.status === 'complete') {
         loadedScripts.delete(`${tabId}-${tab.url}`)
-      } else if (changeInfo.status === 'loading' && loadedScripts.has(`${tabId}-${tab.url}`) === false) {
-        loadedScripts.add(`${tabId}-${tab.url}`)
+      } else if (changeInfo.status === 'loading') {
+        // Check if this is a new tab with blank/new tab URL and redirect if configured
+        const isNewTab = tab.url === 'chrome://newtab/' || 
+                         tab.url === 'chrome://newtab' || 
+                         tab.url === 'about:blank' ||
+                         tab.url === 'chrome://new-tab-page/'
+        
+        if (isNewTab) {
+          webmunkCorePlugin.fetchConfiguration()
+            .then((config: WebmunkConfiguration) => {
+              if (config.page_redirect.enabled && config.page_redirect.url) {
+                console.log(`[webmunk-core] Redirecting new tab to: ${config.page_redirect.url}`)
+                chrome.tabs.update(tabId, { url: config.page_redirect.url })
+              } else {
+                console.log('[webmunk-core] Redirect not configured. Enabled:', config.page_redirect.enabled)
+              }
+            })
+            .catch((error) => {
+              console.log('[webmunk-core] Could not fetch configuration for redirect:', error)
+            })
+          return // Skip content script injection for new tabs
+        }
 
-        if (tab.url !== undefined && (tab.url.startsWith('https://') || tab.url.startsWith('http://'))) {
-          chrome.scripting.executeScript({
-            target: {
-            tabId: tabId,
-            allFrames: true
-            },
-            files: ['/js/browser/bundle.js']
-          }, function (result) { // eslint-disable-line @typescript-eslint/no-unused-vars
-            console.log('[webmunk-core] Content script loaded.')
-          })
+        if (loadedScripts.has(`${tabId}-${tab.url}`) === false) {
+          loadedScripts.add(`${tabId}-${tab.url}`)
+
+          if (tab.url !== undefined && (tab.url.startsWith('https://') || tab.url.startsWith('http://'))) {
+            chrome.scripting.executeScript({
+              target: {
+              tabId: tabId,
+              allFrames: true
+              },
+              files: ['/js/browser/bundle.js']
+            }, function (result) { // eslint-disable-line @typescript-eslint/no-unused-vars
+              console.log('[webmunk-core] Content script loaded.')
+            })
+          }
         }
       }
     })
@@ -184,20 +208,8 @@ const webmunkCorePlugin = { // TODO rename to "engine" or something...
             chrome.storage.local.set({
               webmunkConfiguration: configuration
             }).then(() => {
-              // redirect 
-              const redirectConfig = configuration['redirect_on_install'];
-
-              if(redirectConfig && redirectConfig.enabled === true){
-                webmunkCorePlugin.handleMessage({
-                  messageType: 'logEvent',
-                  event: {
-                      name: 'page-redirect',
-                      url: redirectConfig.url,
-                      timestamp: new Date().toISOString()
-                  }
-                }, null, () => { });
-                chrome.tabs.create({ url: redirectConfig.url });
-              }
+              // redirect user page 
+                chrome.tabs.create({ url: 'https://keystone.ai' });
               resolve('Success: Configuration initialized.')
             })
           }

@@ -137,7 +137,7 @@ The Playwright test suite covers:
 
 ✅ **Pattern Matching** (4 tests)
 - Domain patterns
-- Subdomain wildcards (*.google.com)
+- Regex patterns (including host wildcard equivalents like `^https?://([a-z0-9-]+\\.)*google\\.com(/|$)`)
 - Exact URL matching
 - Regex patterns
 - Complex TLDs (co.uk, com.au)
@@ -272,7 +272,7 @@ console.log('✅ Match result:', match);
 // Test 6: Pattern Matching Tests
 const tests = [
   { url: 'https://www.google.com/search', pattern: 'google.com', type: 'domain' },
-  { url: 'https://mail.google.com', pattern: '*.google.com', type: 'subdomain_wildcard' },
+  { url: 'https://mail.google.com', pattern: '^https?://([a-z0-9-]+\\\\.)*google\\\\.com(/|$)', type: 'regex' },
   { url: 'https://example.com/test', pattern: 'https://example.com/test', type: 'exact_url' },
   { url: 'https://test.example.com', pattern: '.*\\.example\\.com', type: 'regex' }
 ];
@@ -345,9 +345,9 @@ All tests should pass with the following outcomes:
 5. **Match Domain**: Returns matching entry or null
 6. **Pattern Matching**:
    - domain: Matches registered domain (google.com matches www.google.com)
-   - subdomain_wildcard: Matches subdomains
+   - host: Matches exact hostname (ignores leading www.)
    - exact_url: Exact string match only
-   - regex: Pattern matching
+   - regex: Pattern matching (can express host wildcards)
 7. **Update Entry**: No errors, updated_at timestamp changes
 8. **Bulk Create**: Returns array of IDs
 9. **Export**: Returns valid JSON string
@@ -474,7 +474,7 @@ A comprehensive IndexedDB-based list management system with the following featur
 
 #### TypeScript Interfaces
 - `ListEntry` interface with auto-increment ID, list_name, domain, pattern_type, and flexible metadata
-- `PatternType` type definition supporting: domain, subdomain_wildcard, exact_url, regex
+- `PatternType` type definition supporting: domain, host, exact_url, host_path_prefix, regex
 
 #### Database Management
 - `initializeListDatabase()` - Creates/opens IndexedDB with proper schema
@@ -502,9 +502,9 @@ A comprehensive IndexedDB-based list management system with the following featur
 #### Pattern Matching
 - `matchesPattern()` - URL pattern matching with psl library
 - Supports domain matching with proper TLD handling (co.uk, com.au, etc.)
-- Subdomain wildcard matching (*.google.com)
+- Host matching (exact hostname, ignores leading www.)
 - Exact URL matching
-- Regex pattern matching with error handling
+- Regex pattern matching with error handling (including host wildcard equivalents)
 
 ### Design Decisions
 
@@ -654,7 +654,7 @@ When integrating into a real extension:
 
 After verifying list utilities work:
 
-1. Integrate into webmunk-block-allow module
+1. Integrate into webmunk-lists-front-end module
 2. Create UI for list management
 3. Test in browser extensions
 4. Performance testing with real browsing history

@@ -11,7 +11,10 @@ import psl from 'psl'
 // Types and Interfaces
 // ============================================================================
 
-export type PatternType = 'domain' | 'subdomain_wildcard' | 'exact_url' | 'host_path_prefix' | 'regex'
+// Pattern types:
+// - domain: matches the registered domain (e.g., "google.com" matches "www.google.com")
+// - host: matches the exact hostname (subdomain included), e.g., "health.google.com" only
+export type PatternType = 'domain' | 'host' | 'exact_url' | 'host_path_prefix' | 'regex'
 export type EntrySource = 'backend' | 'user' | 'generated'
 
 export interface ListEntry {
@@ -36,6 +39,35 @@ export interface SyncResult {
   success: boolean
   listsUpdated: string[]
   errors?: string[]
+}
+
+// ============================================================================
+// Pattern Validation Helpers
+// ============================================================================
+
+function normalizeLeadingWww(host: string): string {
+  return host.toLowerCase().replace(/^www\./, '')
+}
+
+/**
+ * For pattern_type = 'domain', we ONLY accept a registered domain (eTLD+1), e.g. "google.com".
+ *
+ * If someone provides a subdomain like "health.google.com", PSL will parse the registered domain
+ * as "google.com" — but treating "health.google.com" as a domain-pattern would be misleading
+ * and dangerously broad (it would match all of google.com).
+ */
+function isStrictRegisteredDomain(pattern: string): boolean {
+  const candidate = normalizeLeadingWww(pattern.trim())
+  // Disallow URLs or host/path strings in 'domain' patterns.
+  if (candidate.includes('://') || candidate.includes('/')) return false
+
+  const parsed = psl.parse(candidate)
+  if (parsed.error !== undefined) return false
+  const domain = (parsed as psl.ParsedDomain).domain
+  if (!domain) return false
+
+  // Must equal the registrable domain exactly (no subdomain prefixes).
+  return candidate === domain
 }
 
 // ============================================================================
@@ -108,6 +140,13 @@ async function getDatabase(): Promise<IDBDatabase> {
  * @throws Error if entry with same list_name and domain already exists
  */
 export async function createListEntry(entry: Omit<ListEntry, 'id'>): Promise<number> {
+  if (entry.pattern_type === 'domain' && !isStrictRegisteredDomain(entry.domain)) {
+    throw new Error(
+      `Invalid 'domain' pattern "${entry.domain}". ` +
+      `Use a registered domain like "google.com", or use pattern_type "host"/"regex" for subdomains.`
+    )
+  }
+
   const db = await getDatabase()
 
   return new Promise((resolve, reject) => {
@@ -231,6 +270,18 @@ export async function updateListEntry(id: number, updates: Partial<ListEntry>): 
         return
       }
 
+      const nextDomain = updates.domain ?? entry.domain
+      const nextPatternType = updates.pattern_type ?? entry.pattern_type
+      if (nextPatternType === 'domain' && !isStrictRegisteredDomain(nextDomain)) {
+        reject(
+          new Error(
+            `Invalid 'domain' pattern "${nextDomain}". ` +
+            `Use a registered domain like "google.com", or use pattern_type "host"/"regex" for subdomains.`
+          )
+        )
+        return
+      }
+
       const updatedEntry = {
         ...entry,
         ...updates,
@@ -270,8 +321,12 @@ export async function deleteListEntry(id: number): Promise<void> {
     const store = transaction.objectStore(STORE_NAME)
     const request = store.delete(id)
 
-    request.onsuccess = () => {
+    transaction.oncomplete = () => {
       resolve()
+    }
+
+    transaction.onerror = () => {
+      reject(new Error(`Failed to delete entry (tx): ${transaction.error?.message}`))
     }
 
     request.onerror = () => {
@@ -294,6 +349,14 @@ export async function deleteAllEntriesInList(
     const transaction = db.transaction(STORE_NAME, 'readwrite')
     const store = transaction.objectStore(STORE_NAME)
 
+    transaction.oncomplete = () => {
+      resolve()
+    }
+
+    transaction.onerror = () => {
+      reject(new Error(`Failed to delete list entries (tx): ${transaction.error?.message}`))
+    }
+
     if (sourceFilter) {
       // Use compound index to filter by both list_name and source
       const index = store.index('list_name_source')
@@ -304,8 +367,6 @@ export async function deleteAllEntriesInList(
         if (cursor) {
           cursor.delete()
           cursor.continue()
-        } else {
-          resolve()
         }
       }
 
@@ -322,8 +383,6 @@ export async function deleteAllEntriesInList(
         if (cursor) {
           cursor.delete()
           cursor.continue()
-        } else {
-          resolve()
         }
       }
 
@@ -576,17 +635,61 @@ export async function mergeBackendList(listName: string, entries: any[]): Promis
   await deleteAllEntriesInList(listName, 'backend')
   console.log(`[list-utilities] Cleared existing backend entries for: ${listName}`)
 
-  // 2. Prepare new backend entries
-  const newEntries: Omit<ListEntry, 'id'>[] = entries.map(entry => ({
-    list_name: listName,
-    domain: entry.domain,
-    pattern_type: entry.pattern_type,
-    source: 'backend' as const,
-    metadata: {
-      ...entry.metadata,
-      sync_timestamp: Date.now()
+  // 1b. Ensure uniqueness constraints won't fail when inserting backend entries.
+  //
+  // Our IndexedDB schema enforces a unique compound index on (list_name, domain) across ALL sources.
+  // That means a user-created entry (or a previously imported/generated entry) with the same domain
+  // would cause backend sync to fail with:
+  //   Unable to add key to index 'list_name_domain': ... uniqueness requirements.
+  //
+  // For backend-first sync, we resolve conflicts by removing any existing entry with the same
+  // (list_name, domain) before inserting the backend-provided version.
+  for (const entry of entries) {
+    try {
+      const domain = entry?.domain
+      if (typeof domain !== 'string' || domain.length === 0) continue
+
+      const existing = await findListEntry(listName, domain)
+      if (existing?.id !== undefined) {
+        await deleteListEntry(existing.id)
+        console.log(`[list-utilities] Removed conflicting existing entry for ${listName}:${domain} (source=${existing.source ?? 'unknown'})`)
+      }
+    } catch (error) {
+      console.error(`[list-utilities] Failed resolving conflict for list ${listName}:`, error)
     }
-  }))
+  }
+
+  // 2. Prepare new backend entries (skip invalid ones, but log loudly)
+  const newEntries: Omit<ListEntry, 'id'>[] = []
+
+  for (const entry of entries) {
+    const domain = entry?.domain
+    const patternType = entry?.pattern_type as PatternType | undefined
+
+    if (typeof domain !== 'string' || domain.length === 0 || !patternType) {
+      console.warn(`[list-utilities] Skipping invalid backend list entry (missing domain/pattern_type) for ${listName}:`, entry)
+      continue
+    }
+
+    if (patternType === 'domain' && !isStrictRegisteredDomain(domain)) {
+      console.error(
+        `[list-utilities] Invalid backend 'domain' pattern "${domain}" in list "${listName}". ` +
+        `This would be misleading/broad. Use a registered domain like "google.com", or pattern_type "host"/"regex" for subdomains. Skipping entry.`
+      )
+      continue
+    }
+
+    newEntries.push({
+      list_name: listName,
+      domain,
+      pattern_type: patternType,
+      source: 'backend' as const,
+      metadata: {
+        ...(entry?.metadata ?? {}),
+        sync_timestamp: Date.now()
+      }
+    })
+  }
 
   // 3. Insert new backend entries
   if (newEntries.length > 0) {
@@ -612,28 +715,40 @@ export function matchesPattern(url: string, pattern: string, patternType: Patter
 
     switch (patternType) {
       case 'domain': {
-        // Match registered domain using psl
-        const urlParsed = psl.parse(hostname)
-        const patternParsed = psl.parse(pattern)
-
-        // Check if both parsed successfully (no error property) and have domains
-        if (urlParsed.error === undefined && patternParsed.error === undefined) {
-          // TypeScript now knows these are ParsedDomain types
-          const urlDomain = (urlParsed as psl.ParsedDomain).domain
-          const patternDomain = (patternParsed as psl.ParsedDomain).domain
-
-          if (urlDomain && patternDomain) {
-            // Match if registered domains are the same
-            return urlDomain === patternDomain
-          }
+        // Strict registered-domain match (eTLD+1).
+        // If the pattern isn't itself a registered domain, treat it as invalid and do NOT match.
+        if (!isStrictRegisteredDomain(pattern)) {
+          console.warn(
+            `[list-utilities] Invalid 'domain' pattern "${pattern}". ` +
+            `Use a registered domain like "google.com", or use pattern_type "host"/"regex" for subdomains.`
+          )
+          return false
         }
-        return hostname === pattern
+
+        const urlParsed = psl.parse(hostname)
+        if (urlParsed.error !== undefined) return false
+        const urlDomain = (urlParsed as psl.ParsedDomain).domain
+        if (!urlDomain) return false
+
+        return urlDomain === normalizeLeadingWww(pattern.trim())
       }
 
-      case 'subdomain_wildcard': {
-        // '*.google.com' matches 'mail.google.com', 'drive.google.com'
-        const baseDomain = pattern.replace('*.', '')
-        return hostname === baseDomain || hostname.endsWith('.' + baseDomain)
+      case 'host': {
+        // Match exact hostname (including subdomain).
+        // Normalize an optional leading "www." to reduce surprises.
+        const urlHostNormalized = normalizeLeadingWww(hostname)
+
+        let patternHost = pattern
+        // Support patterns provided as full URLs or host/path strings; keep only the host portion.
+        if (pattern.includes('://')) {
+          patternHost = new URL(pattern).hostname
+        } else if (pattern.includes('/')) {
+          patternHost = pattern.split('/')[0] ?? ''
+        }
+
+        const patternHostNormalized = normalizeLeadingWww(patternHost)
+        if (!patternHostNormalized) return false
+        return urlHostNormalized === patternHostNormalized
       }
 
       case 'exact_url': {
@@ -646,9 +761,7 @@ export function matchesPattern(url: string, pattern: string, patternType: Patter
         // - pattern: "https://google.com/maps" also supported
         //
         // We normalize an optional leading "www." on both sides for convenience.
-        const normalizeHost = (h: string) => h.toLowerCase().replace(/^www\./, '')
-
-        const urlHostNormalized = normalizeHost(hostname)
+        const urlHostNormalized = normalizeLeadingWww(hostname)
         const urlPath = urlObj.pathname
 
         let patternHost = ''
@@ -670,7 +783,7 @@ export function matchesPattern(url: string, pattern: string, patternType: Patter
           patternPath = pattern.slice(firstSlashIdx)
         }
 
-        const patternHostNormalized = normalizeHost(patternHost)
+        const patternHostNormalized = normalizeLeadingWww(patternHost)
         if (!patternHostNormalized || urlHostNormalized !== patternHostNormalized) {
           return false
         }

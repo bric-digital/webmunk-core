@@ -233,8 +233,8 @@
                     { url: 'https://www.google.com/search', pattern: 'google.com', type: 'domain', expected: true },
                     { url: 'https://mail.google.com', pattern: 'google.com', type: 'domain', expected: true },
                     { url: 'https://facebook.com', pattern: 'google.com', type: 'domain', expected: false },
-                    { url: 'https://mail.google.com', pattern: '*.google.com', type: 'subdomain_wildcard', expected: true },
-                    { url: 'https://google.com', pattern: '*.google.com', type: 'subdomain_wildcard', expected: true },
+                    { url: 'https://mail.google.com', pattern: '^https?://([a-z0-9-]+\\\\.)*google\\\\.com(/|$)', type: 'regex', expected: true },
+                    { url: 'https://google.com', pattern: '^https?://([a-z0-9-]+\\\\.)*google\\\\.com(/|$)', type: 'regex', expected: true },
                     { url: 'https://example.com/test', pattern: 'https://example.com/test', type: 'exact_url', expected: true },
                 ];
 

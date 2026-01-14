@@ -145,6 +145,8 @@ const webmunkCorePlugin = { // TODO rename to "engine" or something...
     if (message.messageType === 'refreshConfiguration') {
       webmunkCorePlugin.fetchConfiguration()
         .then((configuration:WebmunkConfiguration) => {
+          console.log('[webmunk-core] Fetched configuration:')
+          console.log(configuration)
 
           chrome.storage.local.get('webmunkIdentifier')
             .then((response:{ [name: string]: any; }) => { // eslint-disable-line @typescript-eslint/no-explicit-any

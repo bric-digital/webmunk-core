@@ -142,6 +142,41 @@ const webmunkCorePlugin = { // TODO rename to "engine" or something...
       return true
     }
 
+    if (message.messageType === 'refreshConfiguration') {
+      webmunkCorePlugin.fetchConfiguration()
+        .then((configuration:WebmunkConfiguration) => {
+
+          chrome.storage.local.get('webmunkIdentifier')
+            .then((response:{ [name: string]: any; }) => { // eslint-disable-line @typescript-eslint/no-explicit-any
+              const idResponse:WebmunkIdentifierResponse = response as WebmunkIdentifierResponse
+              const identifier = idResponse.webmunkIdentifier
+
+              const configUrlStr = configuration['configuration_url'] as string
+
+              const configUrl:URL = new URL(configUrlStr.replaceAll('<IDENTIFIER>', identifier))
+
+              fetch(configUrl)
+                .then((response: Response) => {
+                  if (response.ok) {
+                    response.json().then((jsonData:WebmunkConfiguration) => {
+                      console.log(`${configUrl}:`)
+                      console.log(jsonData)
+
+                      webmunkCorePlugin.updateConfiguration(message.configuration)
+                        .then((response:string) => {
+                          sendResponse(jsonData)
+                        })
+                    })
+                } else {
+                  sendResponse(null)
+                }
+              })
+          })
+        })
+
+      return true
+    }
+
     if (message.messageType === 'setIdentifier') {
       chrome.storage.local.set({
         webmunkIdentifier: message.identifier

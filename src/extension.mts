@@ -14,12 +14,10 @@ export interface WebmunkMessage {
 
 export interface WebmunkConfiguration {
   ui:WebmunkUIDefinition[],
-  configuration_url:String,
-  messages?: WebmunkMessage[],
-  messageRefreshIntervalMinutes?: number,
-  page_redirect?: {
-    enabled: boolean,
-    url: string
+  configuration_url:string,
+  redirect_on_install?:{
+    enabled:boolean,
+    url:string
   }
 }
 
@@ -303,7 +301,7 @@ class WebmunkCoreIdentifierExtensionModule extends WebmunkExtensionModule {
         console.log('configuration')
         console.log(configuration)
 
-        const configUrlStr = configuration['configuration_url'] as String
+        const configUrlStr = configuration['configuration_url'] as string
 
         const configUrl:URL = new URL(configUrlStr.replaceAll('<IDENTIFIER>', identifier))
 
@@ -343,7 +341,7 @@ class WebmunkCoreIdentifierExtensionModule extends WebmunkExtensionModule {
     if (uiDefinition.identifier == 'identifier') {
       $('#coreSaveIdentifier').off('click')
       $('#coreSaveIdentifier').on('click', () => {
-        const identifier = $('input[type="text"]').val()
+        const identifier = $('#inputIdentifier').val()
 
         me.validateIdentifier(identifier as string)
           .then((finalIdentifier:string) => {
@@ -356,10 +354,22 @@ class WebmunkCoreIdentifierExtensionModule extends WebmunkExtensionModule {
           })
       })
 
+      // Allow Enter key to submit identifier without clicking button
+      $('#inputIdentifier').off('keydown')
+      $('#inputIdentifier').on('keydown', (e) => {
+        // jQuery wraps the native keyboard event in `originalEvent`
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const key = (e as any).originalEvent?.key ?? (e as any).key
+        if (key === 'Enter') {
+          e.preventDefault()
+          $('#coreSaveIdentifier').trigger('click')
+        }
+      })
+
       chrome.runtime.sendMessage({
         'messageType': 'getIdentifier'
       }).then((identifier:string) => {
-        $('input[type="text"]').val(identifier)
+        $('#inputIdentifier').val(identifier)
       })
 
       return true

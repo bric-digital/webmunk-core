@@ -23,9 +23,9 @@ export class WebmunkServiceWorkerModule {
     console.log(`TODO: Implement in ${this.instantiationTarget}...`)
   }
 
-  logEvent(event:any) {
+  logEvent(event:object) {
     if (event !== undefined) {
-
+      console.log('WebmunkServiceWorkerModule: implement "logEvent" in subclass...')
     }
   }
 
@@ -36,6 +36,46 @@ export class WebmunkServiceWorkerModule {
 
 const registeredExtensionModules:WebmunkServiceWorkerModule[] = []
 
+async function maybeRedirectOnInstall(configuration: WebmunkConfiguration): Promise<void> {
+  const redirectConfig = configuration?.redirect_on_install
+  if (!redirectConfig?.enabled) return
+
+  const rawUrl = (redirectConfig.url ?? '').trim()
+  if (!rawUrl) return
+
+  // Don't redirect until we actually have an identifier (otherwise the redirect
+  // happens immediately on install before the user can enter it, which breaks
+  // config selection via identifier).
+  const idResult = await chrome.storage.local.get('webmunkIdentifier')
+  const identifier = idResult.webmunkIdentifier as string | undefined
+  if (!identifier || identifier.length === 0) return
+
+  const doneResult = await chrome.storage.local.get('webmunk_redirect_on_install_done')
+  const alreadyDone = doneResult.webmunk_redirect_on_install_done as boolean | undefined
+  if (alreadyDone) return
+
+  await chrome.storage.local.set({
+    webmunk_redirect_on_install_done: true,
+    webmunk_redirect_on_install_done_at: new Date().toISOString()
+  })
+
+  const url =
+    rawUrl.startsWith('http://') ||
+    rawUrl.startsWith('https://') ||
+    rawUrl.startsWith('chrome-extension://')
+      ? rawUrl
+      : chrome.runtime.getURL(rawUrl.replace(/^\//, ''))
+
+  // Log via the normal module dispatch channel.
+  dispatchEvent({
+    name: 'page-redirect',
+    url,
+    timestamp: new Date().toISOString()
+  })
+
+  chrome.tabs.create({ url })
+}
+
 export function registerWebmunkModule(webmunkModule:WebmunkServiceWorkerModule) {
   console.log(`Registering ${webmunkModule.moduleName()}...`)
   if (!registeredExtensionModules.includes(webmunkModule)) {
@@ -43,6 +83,16 @@ export function registerWebmunkModule(webmunkModule:WebmunkServiceWorkerModule) 
 
     webmunkModule.setup()
     console.log(`Registered ${webmunkModule.moduleName()}!`)
+  }
+}
+
+export function dispatchEvent(event: { name: string; [key: string]: unknown }) {
+  console.log(`[webmunk-core] dispatchEvent: ${event.name} -- ${registeredExtensionModules.length} modules`)
+
+  for (const extensionModule of registeredExtensionModules) {
+    if (extensionModule.logEvent !== undefined) {
+      extensionModule.logEvent(event)
+    }
   }
 }
 
@@ -158,7 +208,13 @@ const webmunkCorePlugin = { // TODO rename to "engine" or something...
       chrome.storage.local.set({
         webmunkIdentifier: message.identifier
       }).then(() => {
-        sendResponse(message.identifier)
+        // If the remote configuration was already fetched/stored (we fetch it
+        // during identifier validation), this is the first moment we can safely
+        // apply redirect-on-install semantics.
+        webmunkCorePlugin.fetchConfiguration()
+          .then((configuration: WebmunkConfiguration) => maybeRedirectOnInstall(configuration))
+          .catch(() => undefined)
+          .finally(() => sendResponse(message.identifier))
       })
 
       return true
@@ -175,15 +231,9 @@ const webmunkCorePlugin = { // TODO rename to "engine" or something...
     }
 
     if (message.messageType == 'logEvent') {
-      console.log(`[webmunk-core] logEvent -- ${registeredExtensionModules.length}`)
-      console.log(message.event)
-
       // message.event = { name:string, ... }
 
       for (const extensionModule of registeredExtensionModules) {
-        console.log(`TRY ${extensionModule.moduleName()}`)
-        console.log(extensionModule.logEvent)
-
         if (extensionModule.logEvent !== undefined) {
           extensionModule.logEvent(message.event)
         }
@@ -202,14 +252,17 @@ const webmunkCorePlugin = { // TODO rename to "engine" or something...
           const configResponse:WebmunkConfigurationResponse = response as WebmunkConfigurationResponse
 
           if (configResponse.webmunkConfiguration !== undefined) {
-
-            resolve('Error: Configuration already initialized.')
+            // Idempotent: the extension UI may call "loadInitialConfiguration"
+            // multiple times (e.g., whenever the UI window is opened). Returning
+            // an error here causes noisy console warnings even though nothing is
+            // actually wrong. Do not overwrite existing configuration.
+            resolve('Success: Configuration already initialized.')
           } else {
             chrome.storage.local.set({
               webmunkConfiguration: configuration
             }).then(() => {
-              // redirect user page 
-                chrome.tabs.create({ url: 'https://keystone.ai' });
+              // Only redirect once we have an identifier (see maybeRedirectOnInstall).
+              maybeRedirectOnInstall(configuration).catch(() => undefined)
               resolve('Success: Configuration initialized.')
             })
           }
@@ -221,12 +274,14 @@ const webmunkCorePlugin = { // TODO rename to "engine" or something...
       chrome.storage.local.set({
         webmunkConfiguration: configuration
       }).then(() => {
+        // If identifier already exists, this may be the moment we can redirect.
+        maybeRedirectOnInstall(configuration).catch(() => undefined)
         resolve('Success: Configuration updated.')
       })
     })
   },
   fetchConfiguration(): Promise<WebmunkConfiguration> {
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve, reject) => { // eslint-disable-line @typescript-eslint/no-unused-vars
       chrome.storage.local.get('webmunkConfiguration')
         .then((response:{ [name: string]: any; }) => { // eslint-disable-line @typescript-eslint/no-explicit-any
           const idResponse:WebmunkConfigurationResponse = response as WebmunkConfigurationResponse

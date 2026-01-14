@@ -1,4 +1,4 @@
-import { type WebmunkConfiguration } from "./extension.mts"
+import { type WebmunkConfiguration } from "./extension.mjs"
 
 export interface WebmunkConfigurationResponse {
   webmunkConfiguration:WebmunkConfiguration

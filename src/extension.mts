@@ -6,9 +6,17 @@ export interface WebmunkUIDefinition {
   depends_on:string[]
 }
 
+export interface WebmunkMessage {
+  message: string,
+  url: string,
+  notify: boolean
+}
+
 export interface WebmunkConfiguration {
   ui:WebmunkUIDefinition[],
-  configuration_url:String
+  configuration_url:String,
+  messages?: WebmunkMessage[],
+  messageRefreshIntervalMinutes?: number,
   page_redirect?: {
     enabled: boolean,
     url: string
@@ -68,16 +76,88 @@ export const webmunkCorePlugin = {
       fetch(configUrl)
         .then((response: Response) => {
           if (response.ok) {
-            response.json().then((jsonData:WebmunkConfiguration) => {
-              chrome.runtime.sendMessage({
-                'messageType': 'loadInitialConfiguration',
-                'configuration': jsonData
-              }).then((response: string) => {
-                if (response.toLowerCase().startsWith('error')) {
-                  reject(`Received error from service worker: ${response}`)
-                } else {
-                  resolve(response)
-                }
+            response.json().then((staticConfig:WebmunkConfiguration) => {
+              // Static config loaded - now fetch dynamic config from Django
+              const configurationUrl = staticConfig.configuration_url as string
+              
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              (chrome.runtime.sendMessage as any)(
+                { messageType: 'getIdentifier' },
+                (identifierResponse: { identifier?: string } | undefined) => {
+                  const identifier = identifierResponse?.identifier || 'unknown-id'
+                  const dynamicConfigUrl = configurationUrl.replace('<IDENTIFIER>', identifier)
+                  
+                  console.log(`[Webmunk] Fetching dynamic config from: ${dynamicConfigUrl}`)
+                  
+                  fetch(dynamicConfigUrl)
+                    .then((dynamicResponse: Response) => {
+                    if (dynamicResponse.ok) {
+                      dynamicResponse.json().then((dynamicConfig: WebmunkConfiguration & { messages?: WebmunkMessage[] }) => {
+                        // Merge static UI config with dynamic messages
+                        const mergedConfig: WebmunkConfiguration = {
+                          ...staticConfig,
+                          ...dynamicConfig,
+                          ui: staticConfig.ui // Ensure UI from static config
+                        }
+                        
+                        // Extract messages separately for routing
+                        const messages = dynamicConfig.messages || []
+                        
+                        // Extract refresh interval (use dynamic if available, else static)
+                        const refreshInterval = dynamicConfig.messageRefreshIntervalMinutes || staticConfig.messageRefreshIntervalMinutes || 5
+                        
+                        // Send to service worker with both config and messages
+                        chrome.runtime.sendMessage({
+                          'messageType': 'loadInitialConfiguration',
+                          'configuration': mergedConfig,
+                          'messages': messages,
+                          'messageRefreshIntervalMinutes': refreshInterval
+                        }).then((swResponse: string) => {
+                          if (swResponse.toLowerCase().startsWith('error')) {
+                            reject(`Received error from service worker: ${swResponse}`)
+                          } else {
+                            resolve(swResponse)
+                          }
+                        }).catch((error) => {
+                          console.error('[Webmunk] Error sending config to service worker:', error)
+                          reject(`Failed to send config to service worker: ${error}`)
+                        })
+                      })
+                    } else {
+                      console.warn(`[Webmunk] Failed to fetch dynamic config, using static only: ${dynamicResponse.statusText}`)
+                      // Fall back to static config if dynamic fails
+                      const refreshInterval = staticConfig.messageRefreshIntervalMinutes || 5
+                      chrome.runtime.sendMessage({
+                        'messageType': 'loadInitialConfiguration',
+                        'configuration': staticConfig,
+                        'messages': [],
+                        'messageRefreshIntervalMinutes': refreshInterval
+                      }).then((swResponse: string) => {
+                        if (swResponse.toLowerCase().startsWith('error')) {
+                          reject(`Received error from service worker: ${swResponse}`)
+                        } else {
+                          resolve(swResponse)
+                        }
+                      })
+                    }
+                  })
+                  .catch((dynamicError) => {
+                    console.warn(`[Webmunk] Error fetching dynamic config: ${dynamicError}, using static only`)
+                    // Fall back to static config if fetch fails
+                    const refreshInterval = staticConfig.messageRefreshIntervalMinutes || 5
+                    chrome.runtime.sendMessage({
+                      'messageType': 'loadInitialConfiguration',
+                      'configuration': staticConfig,
+                      'messages': [],
+                      'messageRefreshIntervalMinutes': refreshInterval
+                    }).then((swResponse: string) => {
+                      if (swResponse.toLowerCase().startsWith('error')) {
+                        reject(`Received error from service worker: ${swResponse}`)
+                      } else {
+                        resolve(swResponse)
+                      }
+                    })
+                  })
               })
             })
           } else {

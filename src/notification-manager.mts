@@ -1,6 +1,10 @@
 // bric/webmunk-core/src/notification-manager.mts
+// NOTE: socket.io-client import commented out - notifications disabled for Django-only setup
+// If Flask notification server is needed in future, uncomment and install: npm install socket.io-client
 
-import { io, Socket } from 'socket.io-client'
+// import { io, Socket } from 'socket.io-client'
+// Using a mock Socket type to prevent compilation errors when socket.io-client is not installed
+type Socket = any
 
 export interface Notification {
   id: string
@@ -56,50 +60,18 @@ export class NotificationManager {
       try {
         this.currentUserId = userId
         
+        // Notifications disabled - Flask/WebSocket support not configured for Django-only setup
+        console.log('[NotificationManager] Notifications disabled (Flask-SocketIO server not configured)')
+        this.isConnected = false
+        
+        // For Django-only setup, resolve without WebSocket
+        resolve()
+        
+        /* DISABLED: socket.io-client removed for Django-only setup
         // Create socket connection with retry logic
-        this.socket = io(this.backendUrl, {
-          reconnection: true,
-          reconnectionDelay: 1000,
-          reconnectionDelayMax: 5000,
-          reconnectionAttempts: this.maxReconnectAttempts,
-          transports: ['websocket', 'polling']
-        })
-
-        // Connection event
-        this.socket.on('connect', () => {
-          console.log('[NotificationManager] Connected to backend')
-          this.isConnected = true
-          this.reconnectAttempts = 0
-          
-          // Register user with backend
-          this.socket!.emit('register_user', { identifier: userId })
-          
-          // Flush any queued activities
-          this.flushActivityQueue()
-          
-          resolve()
-        })
-
-        // Receive new notifications from server
-        this.socket.on('new_notification', (data: any) => {
-          this.handleIncomingNotification(data)
-        })
-
-        // Handle disconnection
-        this.socket.on('disconnect', () => {
-          console.log('[NotificationManager] Disconnected from backend')
-          this.isConnected = false
-        })
-
-        // Handle connection error
-        this.socket.on('connect_error', (error: any) => {
-          console.error('[NotificationManager] Connection error:', error)
-          this.reconnectAttempts++
-          
-          if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-            reject(new Error(`Failed to connect after ${this.maxReconnectAttempts} attempts`))
-          }
-        })
+        this.socket = io(this.backendUrl, {...})
+        // ... rest of socket.io code
+        */
 
       } catch (error) {
         console.error('[NotificationManager] Initialization error:', error)

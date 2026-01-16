@@ -40,6 +40,10 @@ export class WebmunkServiceWorkerModule {
   toString():string {
     return this.moduleName()
   }
+
+  refreshConfiguration() {
+    // Can be overridden by subclasses to activate latest configurations...
+  }
 }
 
 const registeredExtensionModules:WebmunkServiceWorkerModule[] = []
@@ -168,6 +172,10 @@ const webmunkCorePlugin = { // TODO rename to "engine" or something...
 
                       webmunkCorePlugin.updateConfiguration(jsonData)
                         .then((response:string) => {
+                          for (const extensionModule of registeredExtensionModules) {
+                            extensionModule.refreshConfiguration()
+                          }
+
                           sendResponse(jsonData)
                         })
                     })

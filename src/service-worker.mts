@@ -8,12 +8,10 @@ export interface WebmunkIdentifierResponse {
   webmunkIdentifier:string
 }
 
-export class WebmunkServiceWorkerModule extends Object {
+export class WebmunkServiceWorkerModule {
   instantiationTarget:string
 
   constructor() {
-    super()
-
     if (new.target === WebmunkServiceWorkerModule) {
       throw new Error('Cannot be instantiated')
     }
@@ -40,7 +38,7 @@ export class WebmunkServiceWorkerModule extends Object {
   }
 
   toString():string {
-    return `WebmunkServiceWorkerModule (${this.getClass()})`
+    return `WebmunkServiceWorkerModule (Override in subclasses)`
   }
 }
 

@@ -166,7 +166,7 @@ const webmunkCorePlugin = { // TODO rename to "engine" or something...
                       console.log(`${configUrl}:`)
                       console.log(jsonData)
 
-                      webmunkCorePlugin.updateConfiguration(message.configuration)
+                      webmunkCorePlugin.updateConfiguration(jsonData)
                         .then((response:string) => {
                           sendResponse(jsonData)
                         })

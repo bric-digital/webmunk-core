@@ -38,7 +38,7 @@ export class WebmunkServiceWorkerModule {
   }
 
   toString():string {
-    return `WebmunkServiceWorkerModule (Override in subclasses)`
+    return this.moduleName()
   }
 }
 

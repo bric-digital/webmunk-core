@@ -15,7 +15,5 @@ export class WebmunkClientModule {
 }
 
 export function registerWebmunkModule(webmunkModule:WebmunkClientModule) {
-  console.log(`[webmunk-core/browser] Registering ${webmunkModule}...`)
-
   webmunkModule.setup()
 }

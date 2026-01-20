@@ -4,6 +4,7 @@ export interface WebmunkUIDefinition {
   title:string,
   identifier:string,
   depends_on:string[]
+  load_dynamic?:boolean
 }
 
 export interface WebmunkConfiguration {
@@ -34,6 +35,10 @@ export class WebmunkExtensionModule {
 
   activateInterface(uiDefinition:WebmunkUIDefinition):boolean { // eslint-disable-line @typescript-eslint/no-unused-vars
     return false
+  }
+
+  fetchHtmlInterface(identifier:string):string|null {
+    return null
   }
 }
 
@@ -155,42 +160,60 @@ export const webmunkCorePlugin = {
   loadInterface: (uiDefinition:WebmunkUIDefinition) => {
     document.title = uiDefinition.title
 
-    const templateUrl = chrome.runtime.getURL(`interfaces/${uiDefinition.identifier}.html`)
-
     const contentElement:HTMLElement | null = document.getElementById('webmunk-content')
 
-    fetch(templateUrl)
-      .then((response: Response) => {
-        if (response.ok) {
-          response.text().then((htmlText:string) => {
-            let activated = false
+    if (uiDefinition['load_dynamic']) {
+      let htmlText:string|null = null
 
-            if (contentElement !== null) {
-              contentElement.innerHTML = htmlText
-            }
+      for (const extensionModule of registeredExtensionModules) {
+        const content = extensionModule.fetchHtmlInterface(uiDefinition.identifier)
 
-            for (const extensionModule of registeredExtensionModules) {
-              if (extensionModule.activateInterface !== undefined) {
-                if (extensionModule.activateInterface(uiDefinition)) {
-                  activated = true
+        if (content !== null) {
+          htmlText = content
+        }
+      }
+
+      if (htmlText !== null) {
+        if (contentElement !== null) {
+          contentElement.innerHTML = htmlText
+        }
+      }
+    } else {
+      const templateUrl = chrome.runtime.getURL(`interfaces/${uiDefinition.identifier}.html`)
+
+      fetch(templateUrl)
+        .then((response: Response) => {
+          if (response.ok) {
+            response.text().then((htmlText:string) => {
+              let activated = false
+
+              if (contentElement !== null) {
+                contentElement.innerHTML = htmlText
+              }
+
+              for (const extensionModule of registeredExtensionModules) {
+                if (extensionModule.activateInterface !== undefined) {
+                  if (extensionModule.activateInterface(uiDefinition)) {
+                    activated = true
+                  }
                 }
               }
-            }
 
-            if (activated === false && contentElement !== null) {
-              contentElement.innerHTML = `Unable to find module to activate ${templateUrl}...`
+              if (activated === false && contentElement !== null) {
+                contentElement.innerHTML = `Unable to find module to activate ${templateUrl}...`
+              }
+            })
+          } else {
+            if (contentElement !== null) {
+              contentElement.innerHTML = `Error loading template file at ${templateUrl}...`
             }
-          })
-        } else {
-          if (contentElement !== null) {
-            contentElement.innerHTML = `Error loading template file at ${templateUrl}...`
           }
-        }
-      }, (reason:string) => {
-        if (contentElement !== null) {
-          contentElement.innerHTML = `Error loading template file at ${templateUrl}: ${reason}...`
-        }
-      })
+        }, (reason:string) => {
+          if (contentElement !== null) {
+            contentElement.innerHTML = `Error loading template file at ${templateUrl}: ${reason}...`
+          }
+        })
+    }
   },
   setIdentifier: async (identifier:string) => {
     return new Promise<void>((resolve) => {

@@ -12,6 +12,10 @@ export class WebmunkClientModule {
   setup() {
     console.log(`TODO: Implement in ${this.instantiationTarget}...`)
   }
+
+  toString():string {
+    return 'WebmunkClientModule (overrride in subclasses)'
+  }
 }
 
 export function registerWebmunkModule(webmunkModule:WebmunkClientModule) {

@@ -45,7 +45,7 @@ export class WebmunkServiceWorkerModule {
     // Can be overridden by subclasses to activate latest configurations...
   }
 
-  configurationDetails() {
+  configurationDetails():any {
     return {
       module_name: {
         enabled: 'Boolean, true if module is active, false otherwise.',

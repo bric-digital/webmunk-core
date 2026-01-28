@@ -44,6 +44,15 @@ export class WebmunkServiceWorkerModule {
   refreshConfiguration() {
     // Can be overridden by subclasses to activate latest configurations...
   }
+
+  configurationDetails() {
+    return {
+      module_name: {
+        enabled: 'Boolean, true if module is active, false otherwise.',
+        other_params: 'Add JSON-serializable parameters to extend configuration.'
+      }
+    }
+  }
 }
 
 const registeredExtensionModules:WebmunkServiceWorkerModule[] = []

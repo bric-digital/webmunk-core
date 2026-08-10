@@ -19,12 +19,20 @@ export interface REXConfiguration {
 // separator and escaping handling belong to the URL API, not to this function.
 //
 // Only remote http(s) configurations are scoped. A configuration_url may also be
-// an already-resolved chrome-extension:// URL (from rex-config://) or a bare
-// relative path ('config.json'); both are extension-local and need no scope. The
-// relative path is resolved against extensionBaseUrl, which callers supply
+// a rex-config:// URL (a configuration bundled in the extension, resolved here
+// against extensionBaseUrl so serverless setups work in every context), an
+// already-resolved chrome-extension:// URL, or a bare relative path
+// ('config.json'); all three are extension-local and need no scope. The
+// resolution uses extensionBaseUrl, which callers supply
 // (chrome.runtime.getURL('/')) so this stays free of extension APIs.
 export function scopeConfigurationUrl(configUrlStr:string, scope:{ [key: string]: string }, extensionBaseUrl:string):URL {
   const lowerUrlStr = configUrlStr.toLowerCase()
+
+  if (lowerUrlStr.startsWith('rex-config://')) {
+    const bundledPath = configUrlStr.slice('rex-config://'.length).replace(/^\/+/, '')
+
+    return new URL(bundledPath, extensionBaseUrl)
+  }
 
   if (!lowerUrlStr.startsWith('http://') && !lowerUrlStr.startsWith('https://')) {
     return new URL(configUrlStr, extensionBaseUrl)

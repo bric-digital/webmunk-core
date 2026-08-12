@@ -377,13 +377,13 @@ const rexCorePlugin = { // TODO rename to "engine" or something...
             const putRequest = objectStore.put(newValue, newValue.key)
 
             putRequest.onsuccess = function (putEvent) { // eslint-disable-line @typescript-eslint/no-unused-vars
-              console.log(`[rex-core] Value saved successfully. ${newValue.key} = ${newValue.value}.`)
+              console.log(`[rex-core] Value inserted successfully. ${newValue.key} = ${newValue.value}.`)
 
               sendResponse(true)
             }
 
             putRequest.onerror = function (putEvent) {
-              console.error(`[rex-core] Value NOT saved successfully. ${newValue.key} = ${newValue.value}.`)
+              console.error(`[rex-core] Value NOT inserted successfully. ${newValue.key} = ${newValue.value}.`)
               console.error(putEvent)
 
               sendResponse(false)
@@ -414,13 +414,13 @@ const rexCorePlugin = { // TODO rename to "engine" or something...
               const updateRequest = cursor.update(newValue)
 
               updateRequest.onsuccess = function (updateEvent:any) { // eslint-disable-line @typescript-eslint/no-unused-vars, @typescript-eslint/no-explicit-any
-                console.log(`[rex-core] Value saved successfully. ${message.key} = ${newValue.value}.`)
+                console.log(`[rex-core] Value updated successfully. ${message.key} = ${newValue.value}.`)
 
                 sendResponse(true)
               }
 
               updateRequest.onerror = function (updateEvent:any) { // eslint-disable-line @typescript-eslint/no-explicit-any
-                console.error(`[rex-core] Value NOT saved successfully. ${message.key} = ${newValue.value}.`)
+                console.error(`[rex-core] Value NOT updated successfully. ${message.key} = ${newValue.value}.`)
                 console.error(updateEvent)
 
                 sendResponse(false)
@@ -430,6 +430,8 @@ const rexCorePlugin = { // TODO rename to "engine" or something...
         }
 
         cursorRequest.onerror = event => { // eslint-disable-line @typescript-eslint/no-unused-vars
+          console.log(`[rex-core] Error opening cursor:`)
+          console.log(event)
           doInsert()
         }
       }

@@ -341,6 +341,9 @@ const rexCorePlugin = { // TODO rename to "engine" or something...
           if (event.target !== null) {
             const cursor = (event.target as any)['result']// eslint-disable-line @typescript-eslint/no-explicit-any
 
+            console.log(`[rex-core] fetchValue cursor: ${message}`)
+            console.log(cursor)
+
             if (cursor) {
               sendResponse(cursor.value.value)
             } else {

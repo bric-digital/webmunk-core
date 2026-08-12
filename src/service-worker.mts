@@ -410,6 +410,7 @@ const rexCorePlugin = { // TODO rename to "engine" or something...
         }
 
         const newValue = {
+          key: message.key,
           value: message.value
         }
 

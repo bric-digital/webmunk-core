@@ -304,3 +304,35 @@ test('Service worker test: a relative configuration url stays extension-local an
   expect(requestedUrl).toContain('config.json')
   expect(requestedUrl).not.toContain('study=')
 })
+
+// Storing a key that already exists takes the cursor update path instead of the
+// insert path. The replacement record has to carry the key alongside the value,
+// or it drops out of the 'key' index and every later fetchValue for that key
+// resolves null -- the stored value becomes unreachable after its first update.
+test('Service worker test: an updated value stays fetchable by its key', async ({serviceWorker}) => {
+  const storedValue = await serviceWorker.evaluate(async () => {
+    await new Promise((ready) => self.setTimeout(ready, 1500))
+
+    const storeValue = (key, value) => {
+      return new Promise((stored) => {
+        self.rexCorePlugin.handleMessage({
+          'messageType': 'storeValue',
+          'key': key,
+          'value': value
+        }, this, stored)
+      })
+    }
+
+    await storeValue('rex-update-test', 'first')
+    await storeValue('rex-update-test', 'second')
+
+    return new Promise((fetched) => {
+      self.rexCorePlugin.handleMessage({
+        'messageType': 'fetchValue',
+        'key': 'rex-update-test'
+      }, this, fetched)
+    })
+  })
+
+  expect(storedValue).toEqual('second')
+})

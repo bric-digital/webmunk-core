@@ -30,7 +30,7 @@ export class REXServiceWorkerModule {
 
   logEvent(event:object) {
     if (event !== undefined) {
-      console.log('REXServiceWorkerModule: implement "logEvent" in subclass...')
+      // console.log('REXServiceWorkerModule: implement "logEvent" in subclass...')
     }
   }
 
@@ -102,7 +102,6 @@ let rexDatabase:IDBDatabase|null = null
 
 const rexCorePlugin = { // TODO rename to "engine" or something...
   openExtensionWindow: () => {
-    console.log('openExtensionWindow')
     const optionsUrl = chrome.runtime.getURL('index.html')
 
     chrome.tabs.query({}, function (extensionTabs) {
@@ -126,8 +125,6 @@ const rexCorePlugin = { // TODO rename to "engine" or something...
     console.log(`[rex-core] Running setup...`)
 
     chrome.runtime.onInstalled.addListener(function (details:object) { // eslint-disable-line @typescript-eslint/no-unused-vars
-      console.log(`[rex-core] chrome.runtime.onInstalled.addListener`)
-
       // Record the install time once, the first time it is seen. Stored here so
       // every extension has it via the getInstallTime message instead of each
       // study extension recording its own. Set-if-absent so updates/reloads
@@ -143,7 +140,6 @@ const rexCorePlugin = { // TODO rename to "engine" or something...
     })
 
     chrome.action.onClicked.addListener(function (tab) { // eslint-disable-line @typescript-eslint/no-unused-vars
-      console.log(`[rex-core] chrome.action.onClicked.addListener`)
       rexCorePlugin.openExtensionWindow()
     })
 
@@ -169,7 +165,6 @@ const rexCorePlugin = { // TODO rename to "engine" or something...
       }
     })
 
-    console.log(`[rex-core] Registered message listener...`)
     chrome.runtime.onMessage.addListener(rexCorePlugin.handleMessage)
 
     const request = indexedDB.open('rex_db', REX_DATABASE_VERSION)
@@ -185,7 +180,7 @@ const rexCorePlugin = { // TODO rename to "engine" or something...
     }
 
     request.onupgradeneeded = (event) => {
-      console.log(`[rex-core] Upgrade needed...`)
+      console.log(`[rex-core] Database upgrade required...`)
       console.log(event)
 
       rexDatabase = request.result
@@ -233,8 +228,8 @@ const rexCorePlugin = { // TODO rename to "engine" or something...
     if (message.messageType === 'refreshConfiguration') {
       rexCorePlugin.fetchConfiguration()
         .then((configuration:REXConfiguration) => {
-          console.log('[rex-core] Fetched configuration:')
-          console.log(configuration)
+          // console.log('[rex-core] Fetched configuration:')
+          // console.log(configuration)
 
           const configUrlStr = configuration['configuration_url'] as string
 
@@ -249,9 +244,6 @@ const rexCorePlugin = { // TODO rename to "engine" or something...
                 .then((response: Response) => {
                   if (response.ok) {
                     response.json().then((jsonData:REXConfiguration) => {
-                      console.log(`${configUrl}:`)
-                      console.log(jsonData)
-
                       if (jsonData === null || jsonData === undefined) {
                         sendResponse(null)
                         return
@@ -341,11 +333,6 @@ const rexCorePlugin = { // TODO rename to "engine" or something...
           if (event.target !== null) {
             const cursor = (event.target as any)['result']// eslint-disable-line @typescript-eslint/no-explicit-any
 
-            console.log(`[rex-core] fetchValue message:`)
-            console.log(message)
-            console.log(`[rex-core] fetchValue cursor:`)
-            console.log(cursor)
-
             if (cursor) {
               sendResponse(cursor.value.value)
             } else {
@@ -355,7 +342,7 @@ const rexCorePlugin = { // TODO rename to "engine" or something...
         }
 
         cursorRequest.onerror = event => {
-          console.log(`fetch error for ${message.key}...`)
+          console.log(`[rex-core] Fetch error for ${message.key}...`)
           console.log(event)
 
           sendResponse(null)
@@ -379,8 +366,6 @@ const rexCorePlugin = { // TODO rename to "engine" or something...
             const putRequest = objectStore.put(newValue, newValue.key)
 
             putRequest.onsuccess = function (putEvent) { // eslint-disable-line @typescript-eslint/no-unused-vars
-              console.log(`[rex-core] Value inserted successfully. ${newValue.key} = ${newValue.value}.`)
-
               sendResponse(true)
             }
 
@@ -405,9 +390,6 @@ const rexCorePlugin = { // TODO rename to "engine" or something...
         const cursorRequest = index.openCursor(IDBKeyRange.only(message.key));
 
         cursorRequest.onsuccess = event => {
-          console.log(`fetched for ${message.key}...`)
-          console.log(event)
-
           if (event.target !== null) {
             const cursor = (event.target as any)['result']// eslint-disable-line @typescript-eslint/no-explicit-any
 
@@ -417,8 +399,6 @@ const rexCorePlugin = { // TODO rename to "engine" or something...
               const updateRequest = cursor.update(newValue)
 
               updateRequest.onsuccess = function (updateEvent:any) { // eslint-disable-line @typescript-eslint/no-unused-vars, @typescript-eslint/no-explicit-any
-                console.log(`[rex-core] Value updated successfully. ${message.key} = ${newValue.value}.`)
-
                 sendResponse(true)
               }
 
@@ -448,8 +428,6 @@ const rexCorePlugin = { // TODO rename to "engine" or something...
       if (extensionModule.handleMessage !== undefined) {
         if (extensionModule.handleMessage(message, sender, sendResponse)) {
           handled = true
-          console.log(`[rex-core] ${extensionModule} handles message:`)
-          console.log(message)
         }
       }
     }

@@ -207,6 +207,27 @@ const rexCorePlugin = { // TODO rename to "engine" or something...
       return true
     }
 
+    if (message.messageType == 'waitForConfiguration') {
+      const event = message.event
+
+      if (event !== undefined) {
+        if (event.timeout !== undefined) {
+          const checkConfig = () => {
+            rexCorePlugin.fetchConfiguration()
+              .then((configuration:REXConfiguration) => {
+                sendResponse(configuration)
+              }).catch(() => {
+                self.setTimeout(checkConfig, 1000)
+              })
+          }
+
+          checkConfig()
+        }
+      }
+
+      return true
+    }
+
     if (message.messageType == 'updateConfiguration') {
       rexCorePlugin.updateConfiguration(message.configuration)
         .then((response:string) => {
@@ -412,7 +433,7 @@ const rexCorePlugin = { // TODO rename to "engine" or something...
           }
         }
 
-        cursorRequest.onerror = event => { // eslint-disable-line @typescript-eslint/no-unused-vars
+        cursorRequest.onerror = event => {
           console.log(`[rex-core] Error opening cursor:`)
           console.log(event)
           doInsert()
@@ -476,11 +497,13 @@ const rexCorePlugin = { // TODO rename to "engine" or something...
     })
   },
   fetchConfiguration: ():Promise<REXConfiguration> => {
-    return new Promise((resolve, reject) => { // eslint-disable-line @typescript-eslint/no-unused-vars
+    return new Promise((resolve, reject) => {
       chrome.storage.local.get('REXConfiguration')
         .then((response:{ [name: string]: any; }) => { // eslint-disable-line @typescript-eslint/no-explicit-any
           const idResponse:REXConfigurationResponse = response as REXConfigurationResponse
           resolve(idResponse.REXConfiguration)
+        }).catch(() => {
+          reject()
         })
     })
   },

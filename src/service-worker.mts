@@ -1,3 +1,5 @@
+import check from 'check-types'
+
 import { type REXConfiguration, hash } from "./common.mjs"
 
 export interface EventPayload {
@@ -198,6 +200,10 @@ const rexCorePlugin = { // TODO rename to "engine" or something...
     }
   },
   handleMessage: (message:any, sender:any, sendResponse:(response:any) => void):boolean => { // eslint-disable-line @typescript-eslint/no-explicit-any
+    if (check.function(sendResponse) === false) {
+      throw new Error(`sendResponse is not a function.`)
+    }
+
     if (message.messageType == 'loadInitialConfiguration') {
       rexCorePlugin.initializeConfiguration(message.configuration)
         .then((response:string) => {

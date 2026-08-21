@@ -212,17 +212,29 @@ const rexCorePlugin = { // TODO rename to "engine" or something...
 
       if (event !== undefined) {
         if (event.timeout !== undefined) {
+          const start = Date.now()
+
           const checkConfig = () => {
             rexCorePlugin.fetchConfiguration()
               .then((configuration:REXConfiguration) => {
                 sendResponse(configuration)
               }).catch(() => {
-                self.setTimeout(checkConfig, 1000)
+                const now = Date.now()
+
+                if (now - start > event.timeout) {
+                  throw new Error(`event.timeout exceeded: ${event.timeout}`)
+                } else {
+                  self.setTimeout(checkConfig, 250)
+                }
               })
           }
 
           checkConfig()
+        } else {
+          throw new Error('event.timeout is undefined')
         }
+      } else {
+        throw new Error('event is undefined')
       }
 
       return true

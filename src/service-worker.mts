@@ -228,8 +228,8 @@ const rexCorePlugin = { // TODO rename to "engine" or something...
                 } else {
                   sendResponse(configuration)
                 }
-              }).catch(() => {
-                console.log(`[waitForConfiguration] catch error`)
+              }).catch((err) => {
+                console.log(`[waitForConfiguration] catch error: ${err}`)
 
                 if (now - start > event.timeout) {
                   console.log(`[waitForConfiguration] event.timeout exceeded: ${event.timeout}`)

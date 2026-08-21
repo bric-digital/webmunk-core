@@ -221,7 +221,7 @@ const rexCorePlugin = { // TODO rename to "engine" or something...
 
             rexCorePlugin.fetchConfiguration()
               .then((configuration:REXConfiguration) => {
-                console.log(`[waitForConfiguration] configuration: ${configuration}`)
+                console.log(`[waitForConfiguration] configuration: ${JSON.stringify(configuration)}`)
 
                 if (configuration === undefined) {
                   throw new Error(`Configuration is undefined.`)

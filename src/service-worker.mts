@@ -223,23 +223,15 @@ const rexCorePlugin = { // TODO rename to "engine" or something...
           const checkConfig = () => {
             const now = Date.now()
 
-            console.log(`[waitForConfiguration] fetching configuration: ${now - start}`)
-
             rexCorePlugin.fetchConfiguration()
               .then((configuration:REXConfiguration) => {
-                console.log(`[waitForConfiguration] configuration: ${JSON.stringify(configuration)}`)
-
                 if (configuration === undefined) {
                   throw new Error(`Configuration is undefined.`)
                 } else {
                   sendResponse(configuration)
                 }
               }).catch((err) => {
-                console.log(`[waitForConfiguration] catch error: ${err}`)
-
                 if (now - start > event.timeout) {
-                  console.log(`[waitForConfiguration] event.timeout exceeded: ${event.timeout}`)
-
                   throw new Error(`event.timeout exceeded: ${event.timeout}`)
                 } else {
                   self.setTimeout(checkConfig, 250)

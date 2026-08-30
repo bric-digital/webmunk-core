@@ -48,7 +48,7 @@
         "jiti": "^2.7.0",
         "jquery": "^4.0.0",
         "psl": "^1.15.0",
-        "typescript": "^6.0.3",
+        "typescript": "^7.0.2",
         "typescript-eslint": "^8.65.0"
     },
     "devDependencies": {

@@ -322,7 +322,7 @@ export class REXCoreIdentifierExtensionModule extends REXExtensionModule {
       }).then((response:{ [name: string]: any; }) => { // eslint-disable-line @typescript-eslint/no-explicit-any
         const configuration = response as REXConfiguration
 
-        if (configuration === null || configuration === undefined) {
+        if (['', undefined, null].includes(configuration as any)) { // eslint-disable-line @typescript-eslint/no-explicit-any
           reject('Configuration not available. Please try again.')
 
           return

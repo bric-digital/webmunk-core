@@ -26,10 +26,20 @@ export function registerREXModule(rexModule:REXClientModule) {
 
 export function injectREXSelectors() {
   $.expr.pseudos.containsInsensitive = $.expr.createPseudo(function (query) {
-    const queryUpper = query.toUpperCase()
+    const key = `${query}`
 
     return function (elem) {
-      return $(elem).text().toUpperCase().includes(queryUpper)
+      const oGElement:any = (elem as any) // eslint-disable-line @typescript-eslint/no-explicit-any
+
+      if (oGElement.REX_CACHE === undefined) {
+        oGElement.REX_CACHE = {}
+      }
+
+      if (oGElement.REX_CACHE[key] === undefined) {
+        oGElement.REX_CACHE[key] = $(elem).text().toUpperCase().includes(query.toUpperCase())
+      }
+
+      return oGElement.REX_CACHE[key]
     }
   })
 
